@@ -316,18 +316,27 @@
       gap: 10px;
     }
     .skill-badge {
-      padding: 8px 18px;
-      border-radius: 99px;
+      position: relative;
+      isolation: isolate;
+      padding: 10px 24px;
       font-size: .875rem;
       font-weight: 600;
+      clip-path: polygon(14px 0%, calc(100% - 14px) 0%, 100% 50%, calc(100% - 14px) 100%, 14px 100%, 0% 50%);
+      background: var(--border-color);
+      cursor: pointer;
+      transition: background .2s, transform .2s, filter .2s;
+    }
+    .skill-badge::before {
+      content: '';
+      position: absolute;
+      inset: 1.5px;
       background: var(--surface);
-      border: 1px solid var(--border-color);
-      transition: border-color .2s, transform .2s;
-      cursor: default;
+      z-index: -1;
     }
     .skill-badge:hover {
-      border-color: var(--primary);
+      background: var(--primary);
       transform: translateY(-2px);
+      filter: drop-shadow(0 4px 8px rgba(139,92,246,.25));
     }
 
     /* ── Projects ── */
@@ -467,6 +476,17 @@
     @keyframes ring-pulse {
       0%, 100% { transform: scale(1); opacity: .3; }
       50%       { transform: scale(1.05); opacity: .15; }
+    }
+
+    /* ── Section reveal ── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity .6s ease, transform .6s ease;
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; transition: none; }
     }
 
     /* ── Responsive ── */
@@ -760,6 +780,8 @@
       });
     }
 
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     // ── Mobile nav toggle
     const hamburger = document.getElementById('hamburger');
     const navLinks  = document.getElementById('navLinks');
@@ -768,11 +790,29 @@
       navLinks.classList.toggle('open');
     });
     navLinks.querySelectorAll('a').forEach(a => {
-      a.addEventListener('click', () => {
+      a.addEventListener('click', e => {
+        const href = a.getAttribute('href');
+        if (href && href.startsWith('#')) {
+          e.preventDefault();
+          const target = document.querySelector(href);
+          if (target) {
+            const navH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nav-h')) || 68;
+            const top = target.getBoundingClientRect().top + window.scrollY - navH;
+            window.scrollTo({ top, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+          }
+        }
         hamburger.classList.remove('open');
         navLinks.classList.remove('open');
       });
     });
+
+    const navLogo = document.querySelector('.nav-logo');
+    if (navLogo) {
+      navLogo.addEventListener('click', e => {
+        e.preventDefault();
+        window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+      });
+    }
 
     // ── Nav scroll style
     const navbar = document.getElementById('navbar');
@@ -793,6 +833,22 @@
       });
     }, { threshold: 0.4 });
     sections.forEach(s => observer.observe(s));
+
+    // ── Section reveal
+    if (!prefersReducedMotion) {
+      const revealObs = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            revealObs.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.15 });
+      document.querySelectorAll('section[id]:not(#hero) .container').forEach(el => {
+        el.classList.add('reveal');
+        revealObs.observe(el);
+      });
+    }
 
     // ── Contact form submit
     const form  = document.getElementById('contactForm');
